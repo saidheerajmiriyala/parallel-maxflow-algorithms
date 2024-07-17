@@ -1,0 +1,88 @@
+
+
+
+// Function to load a graph from a file
+struct Graph* loadGraph(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        printf("Error: Unable to open file.\n");
+        return NULL;
+    }
+
+    int num_edges = 533952;
+    int num_nodes = 110592;
+
+    struct Graph* graph = createGraph(num_nodes, num_edges * 2); // Potentially double the edges
+
+    printf("Loading graph from file...\n");
+
+    int* temp_counts = (int*)calloc(num_nodes, sizeof(int));
+    int* reverse_counts = (int*)calloc(num_nodes, sizeof(int));
+
+    // First pass: count the number of neighbors for each node
+    for (int i = 0; i < num_edges; ++i) {
+        int src, dest;
+        int weight;
+        if (fscanf(file, "%d %d %d\n", &src, &dest, &weight) != 3) {
+            printf("Error: Invalid file format.\n");
+            fclose(file);
+            free(temp_counts);
+            free(reverse_counts);
+            freeGraph(graph);
+            return NULL;
+        }
+        temp_counts[src]++;
+        if (!reverse_counts[dest]) {
+            reverse_counts[dest]++;
+        }
+    }
+
+    // Build the index array
+    graph->indices[0] = 0;
+    for (int i = 1; i <= num_nodes; ++i) {
+        graph->indices[i] = graph->indices[i - 1] + temp_counts[i - 1] + reverse_counts[i - 1];
+    }
+
+    // Reset file pointer to the beginning of the file for the second pass
+    fseek(file, 0, SEEK_SET);
+
+    int* current_pos = (int*)calloc(num_nodes, sizeof(int));
+    int* reverse_pos = (int*)calloc(num_nodes, sizeof(int));
+
+    // Second pass: fill the neighbors array and weights array
+    for (int i = 0; i < num_edges; ++i) {
+        int src, dest;
+        int weight;
+        if (fscanf(file, "%d %d %d\n", &src, &dest, &weight) != 3) {
+            printf("Error: Invalid file format.\n");
+            fclose(file);
+            free(temp_counts);
+            free(reverse_counts);
+            free(current_pos);
+            free(reverse_pos);
+            freeGraph(graph);
+            return NULL;
+        }
+
+        int index_src = graph->indices[src] + current_pos[src]++;
+        graph->neighbors[index_src] = dest;
+        graph->weights[index_src] = weight;
+
+        if (!reverse_counts[dest] || !reverse_pos[dest]) {
+            int index_dest = graph->indices[dest] + temp_counts[dest] + reverse_pos[dest]++;
+            graph->neighbors[index_dest] = src;
+            graph->weights[index_dest] = 0; // Weight 0 for reverse edge
+        }
+    }
+
+    printf("Graph loaded successfully.\n");
+
+    free(temp_counts);
+    free(reverse_counts);
+    free(current_pos);
+    free(reverse_pos);
+    fclose(file);
+    return graph;
+}
+
+
